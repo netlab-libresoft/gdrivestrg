@@ -1,0 +1,2 @@
+module Gdrivestrg
+end
