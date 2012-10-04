@@ -7,11 +7,11 @@ require "gdrivestrg/version"
 Gem::Specification.new do |s|
   s.name        = "gdrivestrg"
   s.version     = Gdrivestrg::VERSION
-  s.authors     = ["TODO: Your name"]
-  s.email       = ["TODO: Your email"]
-  s.homepage    = "TODO"
-  s.summary     = "TODO: Summary of Gdrivestrg."
-  s.description = "TODO: Description of Gdrivestrg."
+  s.authors     = ["Raul Roman-Lopez"]
+  s.email       = ["rroman@libresoft.es"]
+  s.homepage    = "http://git.libresoft.es/gdrivestrg/"
+  s.summary     = "Ruby plugin that installs a Google Drive driver"
+  s.description = "Ruby plugin that installs the Google Drive driver for Cloudstrg system"
 
   s.files = Dir["{app,config,db,lib}/**/*"] + ["MIT-LICENSE", "Rakefile", "README.rdoc"]
   s.test_files = Dir["test/**/*"]
