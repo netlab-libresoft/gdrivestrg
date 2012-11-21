@@ -1,6 +1,6 @@
 require 'cloudstrg/cloudstrg'
 
-class GdriveStorage < CloudStrg::CloudStorage
+class GdriveStrg < CloudStrg::CloudStorage
   require 'google/api_client'
 
   CLIENT_ID = "867108581948.apps.googleusercontent.com"
@@ -25,23 +25,26 @@ class GdriveStorage < CloudStrg::CloudStorage
   def config params
     @client.authorization.redirect_uri =  params[:redirect]
     
-    @username = params[:username]
-    user = Cloudstrguser.find_by_name(@username)
+    @user = params[:user]
+    user_params = @user.gdrivestrgparams
+    if not user_params
+      user_params = @user.gdrivestrgparams.build
+    end
 
     session = params[:session]
     
-    @client.authorization.update_token!(:access_token => session[:gdrive_access_token] , #:access_token => user.gdrive_access_token, 
-                                     :refresh_token => user.gdrive_refresh_token, 
-                                     :expires_in => user.gdrive_expires_in, 
-                                     :issued_at => user.gdrive_issued_at)
+    @client.authorization.update_token!(:access_token => session[:gdrive_access_token] , #:access_token => user_params.access_token, 
+                                     :refresh_token => user_params.refresh_token, 
+                                     :expires_in => user_params.expires_in, 
+                                     :issued_at => user_params.issued_at)
     if @client.authorization.refresh_token && @client.authorization.expired?
       @client.authorization.fetch_access_token!
       session[:gdrive_access_token] = @client.authorization.access_token
       # user.gdrive_access_token = @client.authorization.access_token
-      user.gdrive_refresh_token = @client.authorization.refresh_token
-      user.gdrive_expires_in = @client.authorization.expires_in
-      user.gdrive_issued_at = @client.authorization.issued_at
-      user.save()
+      user_params.refresh_token = @client.authorization.refresh_token
+      user_params.expires_in = @client.authorization.expires_in
+      user_params.issued_at = @client.authorization.issued_at
+      user_params.save()
     end
     
 
@@ -50,10 +53,10 @@ class GdriveStorage < CloudStrg::CloudStorage
       
       session[:gdrive_access_token] = @client.authorization.access_token
       # user.gdrive_access_token = @client.authorization.access_token
-      user.gdrive_refresh_token = @client.authorization.refresh_token
-      user.gdrive_expires_in = @client.authorization.expires_in
-      user.gdrive_issued_at = @client.authorization.issued_at
-      user.save()
+      user_params.refresh_token = @client.authorization.refresh_token
+      user_params.expires_in = @client.authorization.expires_in
+      user_params.issued_at = @client.authorization.issued_at
+      user_params.save()
     elsif params[:error] # User denied the oauth grant
       puts "Denied: #{params[:error]}"
     end
@@ -68,7 +71,6 @@ class GdriveStorage < CloudStrg::CloudStorage
 
   def create_file params
     filename = params[:filename]
-    filename += ".json" if not filename.include? ".json"
 
     file = @drive_api.files.insert.request_schema.new({'title' => filename, 'description' => 'Netlab scenario', 'mimeType' => 'text/json'})
     media=Google::APIClient::UploadIO.new(StringIO.new(params[:file_content]), 'text/json')
@@ -76,11 +78,12 @@ class GdriveStorage < CloudStrg::CloudStorage
     if r.status != 200
       return false
     end
-    true
+    return save_remoteobject(@user, filename, params[:file_content], r.data.id)
+    
   end
 
-  def create_folder params
-  end
+  #def create_folder params
+  #end
 
   def get_file params
     r = @client.execute!(:api_method => @drive_api.files.get, :parameters => {'fileId' => params[:fileid]})
@@ -98,7 +101,6 @@ class GdriveStorage < CloudStrg::CloudStorage
 
   def update_file params
     filename = params[:filename]
-    filename += ".json" if not filename.include? ".json"
 
     file = @drive_api.files.insert.request_schema.new({'title' => filename, 'description' => 'Netlab scenario', 'mimeType' => 'text/json'})
     media=Google::APIClient::UploadIO.new(StringIO.new(params[:file_content]), 'text/json')
@@ -106,7 +108,8 @@ class GdriveStorage < CloudStrg::CloudStorage
     if r.status != 200
       return false
     end
-    true
+    return save_remoteobject(@user, filename, params[:file_content], params[:file_id])
+    
   end
 
   def remove_file params
@@ -121,7 +124,7 @@ class GdriveStorage < CloudStrg::CloudStorage
     
     lines = []
     r.data.items.each do |line|
-      lines.append([line.title, line.id]) if line.title.include? ".json"
+      lines.append([line.title, line.id])
     end
     return lines
   end

@@ -1,0 +1,20 @@
+<p id="notice"><%= notice %></p>
+
+<p>
+  <b>Refresh token:</b>
+  <%= @param.refresh_token %>
+</p>
+
+<p>
+  <b>Expires in:</b>
+  <%= @param.expires_in %>
+</p>
+
+<p>
+  <b>Issued at:</b>
+  <%= @param.issued_at %>
+</p>
+
+
+<%= link_to 'Edit', edit_param_path(@param) %> |
+<%= link_to 'Back', params_path %>

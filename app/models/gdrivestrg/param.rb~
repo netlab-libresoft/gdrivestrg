@@ -1,0 +1,18 @@
+module Gdrivestrg
+  class Param < ActiveRecord::Base
+    attr_accessible :expires_in, :issued_at, :refresh_token
+
+    attr_accessor :user_email
+    belongs_to :user, :class_name => Gdrivestrg.user_class
+    
+    before_save :set_user
+
+    private
+      def set_user
+        self.user = Gdrivestrg.user_class.constantize.find_by_email(user_email)
+        if not self.user
+          return false
+        end
+      end
+  end
+end

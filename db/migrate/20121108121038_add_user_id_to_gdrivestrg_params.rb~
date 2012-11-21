@@ -1,0 +1,5 @@
+class AddUserIdToGdrivestrgParams < ActiveRecord::Migration
+  def change
+    add_column :gdrivestrg_params, "#{Gdrivestrg.user_class}_id".to_sym, :integer
+  end
+end
