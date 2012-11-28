@@ -64,6 +64,7 @@ class GdriveStrg < CloudStrg::CloudStorage
     if not authorized?
       #user.gdrive_refresh_token = @client.authorization.refresh_token
       #user.save
+      session[:plugin_name] = self.class.to_s.split('Strg')[0].downcase
       return session, auth_url
     end
     return session, false
