@@ -67,6 +67,17 @@ class GdriveStrg < CloudStrg::CloudStorage
       session[:plugin_name] = self.class.to_s.split('Strg')[0].downcase
       return session, auth_url
     end
+
+    begin
+      @client.execute!(:api_method => @auth_api.userinfo.get)
+    rescue Exception => e
+      session.delete(:gdrive_access_token)
+      user_params.refresh_token = nil
+      user_params.expires_in = nil
+      user_params.issued_at = nil
+      user_params.save()
+      return config params
+    end
     return session, false
   end
 
