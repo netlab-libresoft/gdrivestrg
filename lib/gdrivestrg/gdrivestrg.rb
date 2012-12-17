@@ -141,6 +141,13 @@ class GdriveStrg < CloudStrg::CloudStorage
     return lines
   end
 
+  def check_referer referer
+    if not referer
+      return false
+    end
+    return referer.include? "accounts.google.com"
+  end
+
 
 
   def authorized?
