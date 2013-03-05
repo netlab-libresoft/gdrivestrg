@@ -6,6 +6,7 @@ class GdriveStrg < CloudStrg::CloudStorage
   CLIENT_ID = "867108581948.apps.googleusercontent.com"
   CLIENT_SECRET = "Z3TXaBvx36ex8RRD-Wu-3PGK"
   SCOPES = [
+      'https://www.googleapis.com/auth/drive',
       'https://www.googleapis.com/auth/drive.file', # we will only see the files createdby this app
       'https://www.googleapis.com/auth/userinfo.email',
       'https://www.googleapis.com/auth/userinfo.profile'
@@ -32,25 +33,10 @@ class GdriveStrg < CloudStrg::CloudStorage
     end
 
     session = params[:session]
-    
-    @client.authorization.update_token!(:access_token => session[:gdrive_access_token] , #:access_token => user_params.access_token, 
-                                     :refresh_token => user_params.refresh_token, 
-                                     :expires_in => user_params.expires_in, 
-                                     :issued_at => user_params.issued_at)
-    if @client.authorization.refresh_token && @client.authorization.expired?
-      @client.authorization.fetch_access_token!
-      session[:gdrive_access_token] = @client.authorization.access_token
-      # user.gdrive_access_token = @client.authorization.access_token
-      user_params.refresh_token = @client.authorization.refresh_token
-      user_params.expires_in = @client.authorization.expires_in
-      user_params.issued_at = @client.authorization.issued_at
-      user_params.save()
-    end
-    
 
     if params[:code]
       authorize_code(params[:code])
-      
+
       session[:gdrive_access_token] = @client.authorization.access_token
       # user.gdrive_access_token = @client.authorization.access_token
       user_params.refresh_token = @client.authorization.refresh_token
@@ -59,24 +45,39 @@ class GdriveStrg < CloudStrg::CloudStorage
       user_params.save()
     elsif params[:error] # User denied the oauth grant
       puts "Denied: #{params[:error]}"
-    end
-
-    if not authorized?
-      #user.gdrive_refresh_token = @client.authorization.refresh_token
-      #user.save
-      session[:plugin_name] = self.class.to_s.split('Strg')[0].downcase
-      return session, auth_url
-    end
-
-    begin
-      @client.execute!(:api_method => @auth_api.userinfo.get)
-    rescue Exception => e
-      session.delete(:gdrive_access_token)
-      user_params.refresh_token = nil
-      user_params.expires_in = nil
-      user_params.issued_at = nil
-      user_params.save()
-      return config params
+    else
+      if params[:refresh_token] and params[:access_token] and params[:expires_in]
+        session[:gdrive_access_token] = params[:access_token]
+        # user.gdrive_access_token = @client.authorization.access_token
+        user_params.refresh_token = params[:refresh_token]
+        user_params.expires_in = params[:expires_in]
+        user_params.save()
+        user_params.issued_at = user_params.updated_at
+        user_params.save()
+      end
+      @client.authorization.update_token!(:access_token => session[:gdrive_access_token] , #:access_token => user_params.access_token, 
+                                     :refresh_token => user_params.refresh_token, 
+                                     :expires_in => user_params.expires_in, 
+                                     :issued_at => user_params.issued_at)
+      if @client.authorization.refresh_token && @client.authorization.expired?
+        session = requestAccessToken(session, user_params)
+      else
+        if not authorized?
+          if @client.authorization.refresh_token
+            session = requestAccessToken(session, user_params)
+          else
+            session[:plugin_name] = self.class.to_s.split('Strg')[0].downcase
+            return session, auth_url
+          end
+        else
+          begin
+            @client.execute!(:api_method => @auth_api.userinfo.get)
+          rescue Exception => e
+            session.delete(:gdrive_access_token)
+            session = requestAccessToken(session, user_params)
+          end
+        end
+      end
     end
     return session, false
   end
@@ -141,7 +142,25 @@ class GdriveStrg < CloudStrg::CloudStorage
     return lines
   end
 
+  def share_file params
+    new_permission = @drive_api.permissions.insert.request_schema.new({'value' => params[:share_email], 'type' => 'user', 'role' => 'writer'})
+    result = @client.execute!(
+      :api_method => @drive_api.permissions.insert,
+      :body_object => new_permission,
+      :parameters => { 'fileId' => params[:file_id] })
+    if result.status == 200
+      return result.data[:id]
+    else
+      puts "An error occurred: #{result.data['error']['message']}"
+      return false
+    end
+
+  end
+
   def check_referer referer
+    if not referer
+      return false
+    end
     return referer.include? "accounts.google.com"
   end
 
@@ -158,5 +177,16 @@ class GdriveStrg < CloudStrg::CloudStorage
 
   def auth_url(state = '')
     return @client.authorization.authorization_uri().to_s
+  end
+
+  def requestAccessToken(session, user_params)
+    @client.authorization.fetch_access_token!
+    session[:gdrive_access_token] = @client.authorization.access_token
+    # user.gdrive_access_token = @client.authorization.access_token
+    user_params.refresh_token = @client.authorization.refresh_token
+    user_params.expires_in = @client.authorization.expires_in
+    user_params.issued_at = @client.authorization.issued_at
+    user_params.save()
+    return session
   end
 end
