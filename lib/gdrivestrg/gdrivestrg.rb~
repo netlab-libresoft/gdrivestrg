@@ -46,14 +46,15 @@ class GdriveStrg < CloudStrg::CloudStorage
     elsif params[:error] # User denied the oauth grant
       puts "Denied: #{params[:error]}"
     else
-      if params[:refresh_token] and params[:access_token] and params[:expires_in]
-        session[:gdrive_access_token] = params[:access_token]
-        # user.gdrive_access_token = @client.authorization.access_token
+      if params[:refresh_token] and params[:expires_in]
         user_params.refresh_token = params[:refresh_token]
         user_params.expires_in = params[:expires_in]
         user_params.save()
         user_params.issued_at = user_params.updated_at
         user_params.save()
+      end
+      if params[:access_token]
+        session[:gdrive_access_token] = params[:access_token]
       end
       @client.authorization.update_token!(:access_token => session[:gdrive_access_token] , #:access_token => user_params.access_token, 
                                      :refresh_token => user_params.refresh_token, 
@@ -71,7 +72,7 @@ class GdriveStrg < CloudStrg::CloudStorage
           end
         else
           begin
-            @client.execute!(:api_method => @auth_api.userinfo.get)
+            r = @client.execute!(:api_method => @auth_api.userinfo.get)
           rescue Exception => e
             session.delete(:gdrive_access_token)
             session = requestAccessToken(session, user_params)
@@ -152,7 +153,7 @@ class GdriveStrg < CloudStrg::CloudStorage
       return result.data[:id]
     else
       puts "An error occurred: #{result.data['error']['message']}"
-      return false
+      return nil
     end
 
   end
