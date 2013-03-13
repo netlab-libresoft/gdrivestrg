@@ -72,7 +72,27 @@ class GdriveStrg < CloudStrg::CloudStorage
           end
         else
           begin
-            @client.execute!(:api_method => @auth_api.userinfo.get)
+            if @user.gdrivestrgfolder
+              @client.execute!(:api_method => @auth_api.userinfo.get)
+            else
+              #Search for folder and if it's not present create it and insert existing files on it.
+              l = search_files_by_title Gdrivestrg.app_name
+              if l.length > 0
+                folder = @user.build_gdrivestrgfolder(:folder_name => l[0][0], :remote_id => l[0][1])
+                folder.save
+              else
+                f_id = create_folder({:foldername => Gdrivestrg.app_name})
+                folder = @user.build_gdrivestrgfolder(:folder_name => Gdrivestrg.app_name, :remote_id => f_id)
+                folder.save
+                files = Cloudstrg::Remoteobject.where(:user_id => @user.id, :cloudstrgplugin_id => Cloudstrg::Cloudstrgplugin.find_by_plugin_name('gdrive').id)
+                _params = {}
+                files.each do |file|
+                  _params[:folder_id] = f_id
+                  _params[:file_id] = file.file_remote_id
+                  insert_parent _params
+                end
+              end
+            end
           rescue Exception => e
             session.delete(:gdrive_access_token)
             session = requestAccessToken(session, user_params)
@@ -84,9 +104,10 @@ class GdriveStrg < CloudStrg::CloudStorage
   end
 
   def create_file params
+    # TODO check folder
     filename = params[:filename]
-
-    file = @drive_api.files.insert.request_schema.new({'title' => filename, 'description' => 'Netlab scenario', 'mimeType' => 'text/json'})
+    parentID = @user.gdrivestrgfolder.remote_id
+    file = @drive_api.files.insert.request_schema.new({'title' => filename, 'parents' => [{'id' => parentID}], 'description' => 'Netlab file', 'mimeType' => 'text/json'})
     media=Google::APIClient::UploadIO.new(StringIO.new(params[:file_content]), 'text/json')
     r = @client.execute(:api_method => @drive_api.files.insert, :body_object => file, :media => media, :parameters => {'uploadType' => 'multipart', 'alt' => 'json'})
     if r.status != 200
@@ -96,8 +117,16 @@ class GdriveStrg < CloudStrg::CloudStorage
     
   end
 
-  #def create_folder params
-  #end
+  def create_folder params
+    foldername = params[:foldername]
+
+    file = @drive_api.files.insert.request_schema.new({'title' => foldername, 'mimeType' => 'application/vnd.google-apps.folder'})
+    r = @client.execute(:api_method => @drive_api.files.insert, :body_object => file)
+    if r.status != 200
+      return false
+    end
+    return r.data.id
+  end
 
   def get_file params
     r = @client.execute!(:api_method => @drive_api.files.get, :parameters => {'fileId' => params[:fileid]})
@@ -141,6 +170,33 @@ class GdriveStrg < CloudStrg::CloudStorage
       lines.append([line.title, line.id])
     end
     return lines
+  end
+
+  def search_files_by_title file_title
+    parameters = {'q' => "title = '#{file_title}'"}
+    r=@client.execute!(:api_method => @drive_api.files.list, :parameters => parameters)
+    if r.status != 200
+      return []
+    end
+    
+    lines = []
+    if r.data.items
+      r.data.items.each do |line|
+        lines.append([line.title, line.id])
+      end
+    end
+    return lines
+  end
+
+  def insert_parent params
+    new_parent = @drive_api.parents.insert.request_schema.new({'id' => params[:folder_id]})
+    result = @client.execute!( :api_method => @drive_api.parents.insert, :body_object => new_parent, :parameters => { 'fileId' => params[:file_id] })
+    if result.status == 200
+      return result.data
+    else
+      puts "An error occurred: #{result.data['error']['message']}"
+      return nil
+    end
   end
 
   def share_file params
