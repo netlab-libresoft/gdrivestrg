@@ -200,15 +200,41 @@ class GdriveStrg < CloudStrg::CloudStorage
   end
 
   def share_file params
-    new_permission = @drive_api.permissions.insert.request_schema.new({'value' => params[:share_email], 'type' => 'user', 'role' => 'writer'})
+    new_permission = @drive_api.permissions.insert.request_schema.new({'value' => params[:share_email], 'type' => 'user', 'role' => 'reader'})
     result = @client.execute!(
       :api_method => @drive_api.permissions.insert,
       :body_object => new_permission,
       :parameters => { 'fileId' => params[:file_id] })
     if result.status == 200
-      return result.data[:id]
+      file = Cloudstrg::Remoteobject.find(params[:local_file_id])
+      file.gdrivestrgpermissions.build(:user_id => params[:user_id], :permission_id => result.data['id'])
+      file.save
+      return result.data['id']
     else
       puts "An error occurred: #{result.data['error']['message']}"
+      return nil
+    end
+
+  end
+
+  def unshare_file params
+    permission = Gdrivestrg::PermissionId.find_by_user_id_and_remoteobject_id(params[:user_id], params[:local_file_id])
+      p "############################"
+      p permission
+      p "############################"
+
+    if not permission
+      puts "Permission not found"
+      return nil
+    end
+    result = @client.execute!(
+      :api_method => @drive_api.permissions.delete,
+      :parameters => { 'fileId' => params[:file_id], 'permissionId' => permission.permission_id })
+    if result.status == 204
+      permission.destroy
+      return "ok"
+    else
+      puts "An error occurred"
       return nil
     end
 
