@@ -1,3 +1,8 @@
 <%- if devise_mapping.omniauthable? %>
-	  <a href='#' onclick="js:google_login('<%= omniauth_authorize_path(resource_name, :google_oauth2) %>', '<%= "#{request.protocol}#{request.host_with_port}" %>', '<%= "#{request.protocol}#{request.host_with_port}" %>');" class="btn-large btn-info" id="btn-sign_in"><%= "Sign in with Google" %></a>
+	  <a href='#' onclick="js:google_login('<%= omniauth_authorize_path(resource_name, :google_oauth2) %>', '<%= "#{request.protocol}#{request.host_with_port}" %>', '<%= "#{request.protocol}#{request.host_with_port}" %>');" id="btn-sign_in">
+		<center><div class="btn btn-info" >
+		  <p><%= "Sign in with " %></p>
+		  <%= image_tag("gdrivestrg/google.png") %>
+		</div></center>
+          </a>
 <% end -%>
