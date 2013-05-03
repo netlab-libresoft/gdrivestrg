@@ -117,6 +117,20 @@ class GdriveStrg < CloudStrg::CloudStorage
     
   end
 
+  def create_generic_file params
+    # TODO check folder
+    filename = params[:filename]
+    parentID = @user.gdrivestrgfolder.remote_id
+    file = @drive_api.files.insert.request_schema.new({'title' => filename, 'parents' => [{'id' => parentID}], 'description' => 'Netlab file', 'mimeType' => params[:mimetype]})
+    media=Google::APIClient::UploadIO.new(params[:file], params[:mimetype], params[:filename])
+    r = @client.execute(:api_method => @drive_api.files.insert, :body_object => file, :media => media, :parameters => {'uploadType' => 'multipart'})
+    if r.status != 200
+      return false
+    end
+    return save_remoteobject(@user, filename, params[:file].read, r.data.id)
+    
+  end
+
   def create_folder params
     foldername = params[:foldername]
 
@@ -217,11 +231,28 @@ class GdriveStrg < CloudStrg::CloudStorage
 
   end
 
+  def share_public_file params
+    new_permission = @drive_api.permissions.insert.request_schema.new({'value' => "", 'type' => 'anyone', 'role' => 'reader', 'withlink' => true})
+    result = @client.execute!(
+      :api_method => @drive_api.permissions.insert,
+      :body_object => new_permission,
+      :parameters => { 'fileId' => params[:file_id] })
+    if result.status == 200
+      file = Cloudstrg::Remoteobject.find(params[:local_file_id])
+      file.gdrivestrgpermissions.build(:user_id => params[:user_id], :permission_id => result.data['id'])
+      file.save
+
+      r = @client.execute!(:api_method => @drive_api.files.get, :parameters => {'fileId' => params[:file_id]})
+      return r.data['webContentLink']
+    else
+      puts "An error occurred: #{result.data['error']['message']}"
+      return nil
+    end
+
+  end
+
   def unshare_file params
     permission = Gdrivestrg::PermissionId.find_by_user_id_and_remoteobject_id(params[:user_id], params[:local_file_id])
-      p "############################"
-      p permission
-      p "############################"
 
     if not permission
       puts "Permission not found"
