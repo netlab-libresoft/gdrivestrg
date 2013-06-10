@@ -3,8 +3,8 @@ require 'cloudstrg/cloudstrg'
 class GdriveStrg < CloudStrg::CloudStorage
   require 'google/api_client'
 
-  CLIENT_ID = "867108581948.apps.googleusercontent.com"
-  CLIENT_SECRET = "Z3TXaBvx36ex8RRD-Wu-3PGK"
+  CLIENT_ID = "203391830542.apps.googleusercontent.com"
+  CLIENT_SECRET = "rDeCX9CGcCYgSph2w8NPsRBr"
   SCOPES = [
       'https://www.googleapis.com/auth/drive',
       'https://www.googleapis.com/auth/drive.file', # we will only see the files createdby this app
